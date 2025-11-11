@@ -2,10 +2,20 @@
 
 import { useState } from 'react';
 import { trpc } from '@/lib/trpc/client';
-import { MessageCircle, User, Settings } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { MessageCircle, User, Settings, Search, UserCircle, Info } from 'lucide-react';
+import { formatIMessageTimestamp, formatMessageDate } from '@/lib/utils';
+import { AISuggestions } from '@/components/AISuggestions';
+import { ContactContextDialog } from '@/components/ContactContextDialog';
+import { UserContextPanel } from '@/components/UserContextPanel';
 
 export default function Home() {
   const [selectedContact, setSelectedContact] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showContactContext, setShowContactContext] = useState(false);
+  const [showUserContext, setShowUserContext] = useState(false);
 
   const { data: contacts, isLoading: contactsLoading } = trpc.contacts.getAll.useQuery();
   const { data: messages, isLoading: messagesLoading } = trpc.messages.getConversation.useQuery(
@@ -13,37 +23,78 @@ export default function Home() {
     { enabled: !!selectedContact }
   );
 
+  const selectedContactData = contacts?.find((c) => c.phoneNumber === selectedContact);
+
+  // Filter contacts based on search
+  const filteredContacts = contacts?.filter((contact) => {
+    const displayName = contact.displayName || contact.phoneNumber;
+    const phoneNumber = contact.phoneNumber;
+    const query = searchQuery.toLowerCase();
+    return displayName.toLowerCase().includes(query) || phoneNumber.toLowerCase().includes(query);
+  });
+
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Sidebar - Contact List */}
       <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
-        <div className="p-4 border-b border-gray-200">
-          <h1 className="text-xl font-bold text-gray-900">iMessage Assistant</h1>
-          <p className="text-sm text-gray-500">AI-powered response suggestions</p>
+        <div className="p-4 border-b border-gray-200 space-y-3">
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">iMessage Assistant</h1>
+            <p className="text-sm text-gray-500">AI-powered response suggestions</p>
+          </div>
+
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Input
+              placeholder="Search contacts..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+
+          {/* User Context Button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowUserContext(true)}
+            className="w-full"
+          >
+            <UserCircle className="w-4 h-4 mr-2" />
+            Your Context & Status
+          </Button>
         </div>
 
         <div className="flex-1 overflow-y-auto">
           {contactsLoading ? (
             <div className="p-4 text-center text-gray-500">Loading contacts...</div>
-          ) : contacts && contacts.length > 0 ? (
+          ) : filteredContacts && filteredContacts.length > 0 ? (
             <div className="divide-y divide-gray-100">
-              {contacts.map((contact) => (
+              {filteredContacts.map((contact) => (
                 <button
                   key={contact.id}
                   onClick={() => setSelectedContact(contact.phoneNumber)}
                   className={`w-full p-4 text-left hover:bg-gray-50 transition-colors ${
-                    selectedContact === contact.phoneNumber ? 'bg-blue-50' : ''
+                    selectedContact === contact.phoneNumber ? 'bg-blue-50 border-l-4 border-blue-500' : ''
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
                       <User className="w-5 h-5 text-blue-600" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-gray-900 truncate">
-                        {contact.displayName || contact.phoneNumber}
+                        {contact.contextData?.name || contact.displayName || contact.phoneNumber}
                       </p>
-                      <p className="text-sm text-gray-500 truncate">{contact.phoneNumber}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs text-gray-500 truncate">{contact.phoneNumber}</p>
+                        {contact.contextData?.formalityLevel && (
+                          <Badge variant="secondary" className="text-xs">
+                            {contact.contextData.formalityLevel}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </button>
@@ -51,7 +102,7 @@ export default function Home() {
             </div>
           ) : (
             <div className="p-4 text-center text-gray-500">
-              No contacts found. Make sure you have iMessage history.
+              {searchQuery ? 'No contacts found' : 'No contacts found. Make sure you have iMessage history.'}
             </div>
           )}
         </div>
@@ -59,7 +110,7 @@ export default function Home() {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
-        {selectedContact ? (
+        {selectedContact && selectedContactData ? (
           <>
             {/* Header */}
             <div className="bg-white border-b border-gray-200 p-4 flex items-center justify-between">
@@ -69,19 +120,30 @@ export default function Home() {
                 </div>
                 <div>
                   <h2 className="font-semibold text-gray-900">
-                    {contacts?.find((c) => c.phoneNumber === selectedContact)?.displayName ||
-                      selectedContact}
+                    {selectedContactData.contextData?.name || selectedContactData.displayName || selectedContact}
                   </h2>
-                  <p className="text-sm text-gray-500">{selectedContact}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm text-gray-500">{selectedContact}</p>
+                    {selectedContactData.contextData?.relationshipType && (
+                      <Badge variant="outline" className="text-xs">
+                        {selectedContactData.contextData.relationshipType}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
               </div>
-              <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                <Settings className="w-5 h-5 text-gray-600" />
-              </button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowContactContext(true)}
+              >
+                <Info className="w-4 h-4 mr-2" />
+                Contact Info
+              </Button>
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
               {messagesLoading ? (
                 <div className="text-center text-gray-500">Loading messages...</div>
               ) : messages && messages.length > 0 ? (
@@ -90,14 +152,19 @@ export default function Home() {
                     key={message.id}
                     className={`flex ${message.isFromMe ? 'justify-end' : 'justify-start'}`}
                   >
-                    <div
-                      className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
-                        message.isFromMe
-                          ? 'bg-blue-500 text-white'
-                          : 'bg-gray-200 text-gray-900'
-                      }`}
-                    >
-                      <p>{message.text}</p>
+                    <div className="max-w-xs lg:max-w-md">
+                      <div
+                        className={`px-4 py-2 rounded-2xl ${
+                          message.isFromMe
+                            ? 'bg-blue-500 text-white rounded-br-sm'
+                            : 'bg-white text-gray-900 rounded-bl-sm border border-gray-200'
+                        }`}
+                      >
+                        <p className="text-sm">{message.text}</p>
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1 px-2">
+                        {formatMessageDate(formatIMessageTimestamp(message.timestamp))}
+                      </p>
                     </div>
                   </div>
                 ))
@@ -106,15 +173,20 @@ export default function Home() {
               )}
             </div>
 
-            {/* Suggestion Area */}
-            <div className="bg-white border-t border-gray-200 p-4">
-              <div className="bg-blue-50 rounded-lg p-4">
-                <p className="text-sm font-medium text-blue-900 mb-2">AI Suggestions</p>
-                <p className="text-sm text-blue-700">
-                  Select a conversation to get AI-powered response suggestions
-                </p>
-              </div>
-            </div>
+            {/* AI Suggestions Panel */}
+            <AISuggestions
+              contactPhone={selectedContact}
+              contactName={selectedContactData.contextData?.name || selectedContactData.displayName}
+              messages={messages || []}
+            />
+
+            {/* Contact Context Dialog */}
+            <ContactContextDialog
+              open={showContactContext}
+              onOpenChange={setShowContactContext}
+              contactPhone={selectedContact}
+              contactName={selectedContactData.contextData?.name || selectedContactData.displayName}
+            />
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center">
@@ -123,13 +195,20 @@ export default function Home() {
               <h2 className="text-xl font-semibold text-gray-900 mb-2">
                 Select a Conversation
               </h2>
-              <p className="text-gray-500">
+              <p className="text-gray-500 mb-4">
                 Choose a contact from the sidebar to view messages and get AI suggestions
               </p>
+              <Button variant="outline" onClick={() => setShowUserContext(true)}>
+                <Settings className="w-4 h-4 mr-2" />
+                Set Your Status
+              </Button>
             </div>
           </div>
         )}
       </div>
+
+      {/* User Context Panel */}
+      <UserContextPanel open={showUserContext} onOpenChange={setShowUserContext} />
     </div>
   );
 }
