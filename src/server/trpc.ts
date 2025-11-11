@@ -1,0 +1,25 @@
+import { initTRPC } from '@trpc/server';
+import { ZodError } from 'zod';
+
+// Create tRPC context
+export const createTRPCContext = async (opts: { headers: Headers }) => {
+  return {
+    headers: opts.headers,
+  };
+};
+
+const t = initTRPC.context<typeof createTRPCContext>().create({
+  errorFormatter({ shape, error }) {
+    return {
+      ...shape,
+      data: {
+        ...shape.data,
+        zodError:
+          error.cause instanceof ZodError ? error.cause.flatten() : null,
+      },
+    };
+  },
+});
+
+export const createTRPCRouter = t.router;
+export const publicProcedure = t.procedure;
