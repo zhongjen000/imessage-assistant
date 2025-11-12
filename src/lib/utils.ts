@@ -28,3 +28,24 @@ export function formatMessageDate(date: Date): string {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
 }
+
+// Get initials from a name or phone number
+export function getInitials(name: string | null, phoneNumber: string): string {
+  if (name && name.trim()) {
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
+  }
+  // For phone numbers, use last 2 digits
+  const digits = phoneNumber.replace(/\D/g, '');
+  return digits.slice(-2);
+}
+
+// Get display name with fallback
+export function getDisplayName(contextName: string | null, displayName: string | null, phoneNumber: string): string {
+  if (contextName && contextName.trim()) return contextName;
+  if (displayName && displayName.trim()) return displayName;
+  return phoneNumber;
+}

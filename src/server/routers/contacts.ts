@@ -4,9 +4,9 @@ import { imessageDB } from '@/lib/db/imessage';
 import { contextDB } from '@/lib/db/context';
 
 export const contactsRouter = createTRPCRouter({
-  // Get all contacts from iMessage
+  // Get all contacts from iMessage with preview and sorted by recency
   getAll: publicProcedure.query(async () => {
-    const imessageContacts = imessageDB.getContacts();
+    const imessageContacts = imessageDB.getContactsWithPreview();
 
     // Merge with context data
     const enrichedContacts = imessageContacts.map((contact) => {
